@@ -162,6 +162,11 @@ include_directories(
 catkin_install_python(PROGRAMS
   scripts/collect_20_config.py
   scripts/grasp_vial.py
+  scripts/collect_20_config_fx.py
+  scripts/grasp_vial_v1.py
+  scripts/grasp_vial_v1_fx.py
+  scripts/grasp_vial_fx.py
+
 
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
