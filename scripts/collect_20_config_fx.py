@@ -5,7 +5,6 @@ import tf
 import tf.transformations as tft
 import os
 import numpy as np
-from franka_gripper.msg import MoveActionGoal
 from geometry_msgs.msg import PoseStamped
 import cv2
 from scipy.spatial.transform import Rotation
@@ -49,8 +48,10 @@ ee_poses = []
 aruco_poses = []
 
 def move_2_20_config(joint_positions, path):
+
     global ee_poses, aruco_poses
-    robot = frankx.Robot("192.168.1.1")  
+    robot = frankx.Robot("10.8.11.204")
+    # robot = 
 
     if not isinstance(joint_positions, list) or not all(isinstance(pos, list) for pos in joint_positions):
         print("Invalid input: joint_positions should be a list of lists")
@@ -95,7 +96,7 @@ def move_2_20_config(joint_positions, path):
     np.savetxt(os.path.join(path, 'aruco_pose.txt'), aruco_poses)
         
 def Eye_2_Hand():
-    num = 14
+    num = 18
     end_effector_poses = np.loadtxt(os.path.join(path, 'ee_pose.txt'))
     aruco_poses = np.loadtxt(os.path.join(path, 'aruco_pose.txt'))
     R_all_end_to_base = []
@@ -223,16 +224,16 @@ if __name__ == '__main__':
     
     rospy.init_node('calib_scripts')
 
-    path = '/home/panda3/panda_moveit_ws/src/calib_scripts/scripts/config'
-    #acquire_data()
-    #Eye_2_Hand()
+    path = '/home/panda2/franka_cam_ws/src/franka_marker/scripts/config'
+    # acquire_data()
+    Eye_2_Hand()
 
     '''
-    test on 05/06/23
+    test on 02/11/23
     E_2_H matrix： 
-    [[-0.02028174 -0.99758689 -0.06640065  0.06010367]
-    [ 0.99979007 -0.02004369 -0.00424929 -0.03320061]
-    [ 0.00290812 -0.06647289  0.99778399 -0.09002263]
+    [[-0.72764462 -0.68585163 -0.01186786  0.05192262]
+    [ 0.68595005 -0.72747031 -0.01610833  0.00849046]
+    [ 0.00241441 -0.01986189  0.99979982  0.0033307 ]
     [ 0.          0.          0.          1.        ]]
 
     '''

@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-
 import rospy
 import tf
 import tf.transformations as tft
 import os
 import numpy as np
-from franka_gripper.msg import MoveActionGoal, GraspActionGoal, GraspEpsilon
+# from franka_gripper.msg import MoveActionGoal, GraspActionGoal, GraspEpsilon
 from geometry_msgs.msg import PoseStamped
 import cv2
 from scipy.spatial.transform import Rotation
@@ -14,29 +13,31 @@ from math import pi
 import copy
 import geometry_msgs.msg
 import quaternion
-import moveit_commander
 import sys
-
-from frankx import Robot, Gripper, Affine
 import frankx
+from frankx import Robot, Gripper, Affine, LinearRelativeMotion, JointMotion, LinearMotion, PositionHold, Kinematics
+
 
 class VialGrasper:
     def __init__(self):
         
         rospy.init_node('vial_grasper')
-        self.p = PandaArm()
-        self.inter = ArmInterface()
-        self.g = self.p.get_gripper()
+        self.robot = frankx.Robot("10.8.11.204")
+        # self.p = PandaArm()
+        # self.inter = ArmInterface()
+        # self.g = self.p.get_gripper()
         self.pose_subscriber = rospy.Subscriber(
             '/aruco_single/pose', PoseStamped, self.pose_callback)
 
-    def move_to_neutral(self):
-       #self.p.wait_for_motion_completion()
-       self.p.move_to_neutral()
+    # def move_to_neutral(self):
+    #    #self.p.wait_for_motion_completion()
+    #    self.p.move_to_neutral()
 
     def move_to_check(self):
         #self.p.wait_for_motion_completion()
-        self.p.move_to_joint_position([0.19723233, -0.5032747, 0.39010309, -2.23760213, 0.12057556, 1.74502069, 1.25511978], timeout=10.0)
+        joint_configuration = frankx.JointPositions([-2.382350443320446, 0.8559828397585142, 2.4082808667129787, -2.385494306028935, -0.3976164341518181, 1.731469306934664, 0.12308264995178478])  # Replace q1-q7 with your desired joint angles
+        self.robot.move(frankx.JointMotion(joint_configuration))
+
 
 
     def B2E(self):
@@ -57,10 +58,10 @@ class VialGrasper:
 
     def E2Q(self, pose_msg):
         # Calculate the transformation matrix from the calibration board to the end effector
-        t_e2c = np.array([0.06010367, -0.03320061, -0.09002263])
-        r_e2c = np.array([[-0.02028174,  -0.99758689,  -0.06640065],
-                          [0.99979007,  -0.02004369,  -0.00424929],
-                          [0.00290812, -0.06647289, 0.99778399]])
+        t_e2c = np.array([0.05192262, 0.00849046, 0.0033307])
+        r_e2c = np.array([[-0.72764462, -0.68585163, -0.01186786],
+                          [0.68595005, -0.72747031, -0.01610833],
+                          [0.00241441, -0.01986189, 0.99979982]])
         T_e2c = tft.compose_matrix(translate=t_e2c, angles=tft.euler_from_matrix(r_e2c))
         T_e2q = tft.concatenate_matrices(T_e2c, self.C2Q(pose_msg))
         #T_q2e_1 = tft.concatenate_matrices(T_c2e, self.Q2C(pose_msg)[1])
@@ -193,33 +194,29 @@ class VialGrasper:
 
 
 def move_to_check():
-    joint_position = [0.02898749, -0.22848525, 0.33815208, -1.72260216, 0.06149956, 1.51219192, 1.12661461]
-    robotx.move_to_joint_position(joint_position)
-
-
-def move_to_check2():
-
-       robotx.move_to_joint_position([-0.43906129, -1.42307817, 1.18843465, -2.62009176, -0.18600077, 2.93034442, 2.11520688], timeout=10.0)
+    # joint_configuration = frankx.JointPositions([-2.382350443320446, 0.8559828397585142, 2.4082808667129787, -2.385494306028935, -0.3976164341518181, 1.731469306934664, 0.12308264995178478])  
+    robotx.move(JointMotion([-2.382350443320446, 0.8559828397585142, 2.4082808667129787, -2.385494306028935, -0.3976164341518181, 1.731469306934664, 0.12308264995178478]))
 
 
 
-def B2E(self):
+
+def B2E():
     # Get current pose from the robot
-    current_pose = self.robotx.current_pose()
+    current_pose = robotx.current_pose()
 
     # Extract position and orientation
     position = current_pose.translation()
     rotation = current_pose.rotation()
 
-    # Convert rotation matrix to quaternion
-    quat = frankx.Rotation(rotation).to_quaternion()
+    # # Convert rotation matrix to quaternion
+    # quat = frankx.Rotation(rotation).to_quaternion()
 
-    # Convert the quaternion to a rotation matrix using tf
-    rotation_matrix = tft.quaternion_matrix(quat)
+    # # Convert the quaternion to a rotation matrix using tf
+    # rotation_matrix = tft.quaternion_matrix(quat)
 
     # Create a 4x4 transformation matrix
     transformation_matrix = np.eye(4)
-    transformation_matrix[:3, :3] = rotation_matrix[:3, :3]
+    transformation_matrix[:3, :3] = rotation
     transformation_matrix[:3, 3] = position
 
     return transformation_matrix
@@ -234,7 +231,7 @@ def T2Q_desired():
     delta_z = 0.015
     h_chemspeed = 0.017
     t_0 = np.array([0, 0, 0.30])
-    t_1 = np.array([0, 0, 0.15])
+    t_1 = np.array([0.10, 0, 0.15])
     t_2 = np.array([-0.1131-delate_x, -0.007-delata_y, 0.15]) # pre pick up position
     t_3 = np.array([-0.1131-delate_x, -0.007-delata_y, 0.05 + delta_z - h_chemspeed]) # pick up position 1
     t_4 = np.array([-0.1131-delate_x, -0.007-delata_y, 0.15]) # rise up
@@ -275,37 +272,37 @@ def T2Q_desired2():
     h_drop = 0
 
     t_0 = np.array([0, 0, 0.30])
-    t_1 = np.array([0, 0, 0.15])
-    t_2 = np.array([-0.016+delate_x, -0.094+delata_y, 0.15]) # pre pick up position
-    t_3 = np.array([-0.016+delate_x, -0.094+delata_y, h_pick-0.002]) # pick up position 1
-    t_4 = np.array([-0.016+delate_x, -0.094+delata_y, 0.15]) # rise up
-    t_5 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # drop-down top
-    t_6 = np.array([-0.0545+delate_x, 0.071+delata_y, h_drop]) # drop down position 1
-    t_7 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # up
-    t_8 = np.array([-0.0545+delate_x, 0.071+delata_y, h_pick]) # pick up position 2
-    t_9 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # up
-    t_10 = np.array([-0.016+delate_x, -0.095+delata_y, 0.15]) # rise up
-    t_11 = np.array([-0.016+delate_x, -0.095+delata_y, h_drop]) # drop down position 2
-    t_12 = np.array([-0.016+delate_x, -0.095+delata_y, 0.15]) # rise up
+    t_1 = np.array([-0.1, 0, 0.15])
+    # t_2 = np.array([-0.016+delate_x, -0.094+delata_y, 0.15]) # pre pick up position
+    # t_3 = np.array([-0.016+delate_x, -0.094+delata_y, h_pick-0.002]) # pick up position 1
+    # t_4 = np.array([-0.016+delate_x, -0.094+delata_y, 0.15]) # rise up
+    # t_5 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # drop-down top
+    # t_6 = np.array([-0.0545+delate_x, 0.071+delata_y, h_drop]) # drop down position 1
+    # t_7 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # up
+    # t_8 = np.array([-0.0545+delate_x, 0.071+delata_y, h_pick]) # pick up position 2
+    # t_9 = np.array([-0.0545+delate_x, 0.071+delata_y, 0.15]) # up
+    # t_10 = np.array([-0.016+delate_x, -0.095+delata_y, 0.15]) # rise up
+    # t_11 = np.array([-0.016+delate_x, -0.095+delata_y, h_drop]) # drop down position 2
+    # t_12 = np.array([-0.016+delate_x, -0.095+delata_y, 0.15]) # rise up
 
     R_d = np.array([pi, 0, -pi/2]) #rxyz here
 
     T_d_0 = tft.compose_matrix(translate=t_0, angles=R_d)
     # print('T_d_0',T_d_0)
     T_d_1 = tft.compose_matrix(translate=t_1, angles=R_d)
-    T_d_2 = tft.compose_matrix(translate=t_2, angles=R_d)
-    T_d_3 = tft.compose_matrix(translate=t_3, angles=R_d)
-    T_d_4 = tft.compose_matrix(translate=t_4, angles=R_d)
-    T_d_5 = tft.compose_matrix(translate=t_5, angles=R_d)
-    T_d_6 = tft.compose_matrix(translate=t_6, angles=R_d)
-    T_d_7 = tft.compose_matrix(translate=t_7, angles=R_d)
-    T_d_8 = tft.compose_matrix(translate=t_8, angles=R_d)
-    T_d_9 = tft.compose_matrix(translate=t_9, angles=R_d)
-    T_d_10 = tft.compose_matrix(translate=t_10, angles=R_d)
-    T_d_11 = tft.compose_matrix(translate=t_11, angles=R_d)
-    T_d_12 = tft.compose_matrix(translate=t_12, angles=R_d)
+    # T_d_2 = tft.compose_matrix(translate=t_2, angles=R_d)
+    # T_d_3 = tft.compose_matrix(translate=t_3, angles=R_d)
+    # T_d_4 = tft.compose_matrix(translate=t_4, angles=R_d)
+    # T_d_5 = tft.compose_matrix(translate=t_5, angles=R_d)
+    # T_d_6 = tft.compose_matrix(translate=t_6, angles=R_d)
+    # T_d_7 = tft.compose_matrix(translate=t_7, angles=R_d)
+    # T_d_8 = tft.compose_matrix(translate=t_8, angles=R_d)
+    # T_d_9 = tft.compose_matrix(translate=t_9, angles=R_d)
+    # T_d_10 = tft.compose_matrix(translate=t_10, angles=R_d)
+    # T_d_11 = tft.compose_matrix(translate=t_11, angles=R_d)
+    # T_d_12 = tft.compose_matrix(translate=t_12, angles=R_d)
 
-    return T_d_0, T_d_1, T_d_2, T_d_3, T_d_4, T_d_5, T_d_6, T_d_7, T_d_8, T_d_9, T_d_10, T_d_11, T_d_12
+    return T_d_0, T_d_1 #, T_d_2, T_d_3, T_d_4, T_d_5, T_d_6, T_d_7, T_d_8, T_d_9, T_d_10, T_d_11, T_d_12
 
 
 def C2Q(pose_msg):
@@ -326,41 +323,42 @@ def C2Q(pose_msg):
     T_c2q = tft.concatenate_matrices(T_now, T2Q_desired()[0])
     #print('T_c2q',T_c2q)
     T_c2q_1 = tft.concatenate_matrices(T_now, T2Q_desired()[1])
-    T_c2q_2 = tft.concatenate_matrices(T_now, T2Q_desired()[2])
-    T_c2q_3 = tft.concatenate_matrices(T_now, T2Q_desired()[3])
-    T_c2q_4 = tft.concatenate_matrices(T_now, T2Q_desired()[4])
-    T_c2q_5 = tft.concatenate_matrices(T_now, T2Q_desired()[5])
-    T_c2q_6 = tft.concatenate_matrices(T_now, T2Q_desired()[6])
-    T_c2q_7 = tft.concatenate_matrices(T_now, T2Q_desired()[7])
-    T_c2q_8 = tft.concatenate_matrices(T_now, T2Q_desired()[8])
-    T_c2q_9 = tft.concatenate_matrices(T_now, T2Q_desired()[9])
-    T_c2q_10 = tft.concatenate_matrices(T_now, T2Q_desired()[10])
-    T_c2q_11 = tft.concatenate_matrices(T_now, T2Q_desired()[11])
-    T_c2q_12 = tft.concatenate_matrices(T_now, T2Q_desired()[12])
-    return T_c2q, T_c2q_1, T_c2q_2, T_c2q_3, T_c2q_4, T_c2q_5, T_c2q_6, T_c2q_7, T_c2q_8, T_c2q_9, T_c2q_10, T_c2q_11, T_c2q_12
+    # T_c2q_2 = tft.concatenate_matrices(T_now, T2Q_desired()[2])
+    # T_c2q_3 = tft.concatenate_matrices(T_now, T2Q_desired()[3])
+    # T_c2q_4 = tft.concatenate_matrices(T_now, T2Q_desired()[4])
+    # T_c2q_5 = tft.concatenate_matrices(T_now, T2Q_desired()[5])
+    # T_c2q_6 = tft.concatenate_matrices(T_now, T2Q_desired()[6])
+    # T_c2q_7 = tft.concatenate_matrices(T_now, T2Q_desired()[7])
+    # T_c2q_8 = tft.concatenate_matrices(T_now, T2Q_desired()[8])
+    # T_c2q_9 = tft.concatenate_matrices(T_now, T2Q_desired()[9])
+    # T_c2q_10 = tft.concatenate_matrices(T_now, T2Q_desired()[10])
+    # T_c2q_11 = tft.concatenate_matrices(T_now, T2Q_desired()[11])
+    # T_c2q_12 = tft.concatenate_matrices(T_now, T2Q_desired()[12])
+    return T_c2q, T_c2q_1 #, T_c2q_2, T_c2q_3, T_c2q_4, T_c2q_5, T_c2q_6, T_c2q_7, T_c2q_8, T_c2q_9, T_c2q_10, T_c2q_11, T_c2q_12
 
 def E2Q(pose_msg):
     # Calculate the transformation matrix from the calibration board to the end effector
-    t_e2c = np.array([0.06010367, -0.03320061, -0.09002263])
-    r_e2c = np.array([[-0.02028174,  -0.99758689,  -0.06640065],
-                        [0.99979007,  -0.020014369,  -0.00424929],
-                        [0.00290812, -0.06647289, 0.99778399]])
+    t_e2c = np.array([0.05192262, 0.00849046, 0.0033307])
+    r_e2c = np.array([[-0.72764462, -0.68585163, -0.01186786],
+                        [0.68595005, -0.72747031, -0.01610833],
+                        [0.00241441, -0.01986189, 0.99979982]])
+
     T_e2c = tft.compose_matrix(translate=t_e2c, angles=tft.euler_from_matrix(r_e2c))
     T_e2q = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[0])
     T_q2e_1 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[1])
-    T_q2e_2 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[2])
-    T_q2e_3 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[3])
-    T_q2e_4 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[4])
-    T_q2e_5 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[5])
-    T_q2e_6 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[6])
-    T_q2e_7 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[7])
-    T_q2e_8 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[8])
-    T_q2e_9 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[9])
-    T_q2e_10 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[10])
-    T_q2e_11 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[11])
-    T_q2e_12 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[12])
+    # T_q2e_2 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[2])
+    # T_q2e_3 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[3])
+    # T_q2e_4 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[4])
+    # T_q2e_5 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[5])
+    # T_q2e_6 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[6])
+    # T_q2e_7 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[7])
+    # T_q2e_8 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[8])
+    # T_q2e_9 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[9])
+    # T_q2e_10 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[10])
+    # T_q2e_11 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[11])
+    # T_q2e_12 = tft.concatenate_matrices(T_e2c, C2Q(pose_msg)[12])
     #print('T_e2q',T_e2q)
-    return T_e2q, T_q2e_1, T_q2e_2, T_q2e_3, T_q2e_4, T_q2e_5, T_q2e_6, T_q2e_7, T_q2e_8, T_q2e_9, T_q2e_10, T_q2e_11, T_q2e_12
+    return T_e2q, T_q2e_1 #, T_q2e_2, T_q2e_3, T_q2e_4, T_q2e_5, T_q2e_6, T_q2e_7, T_q2e_8, T_q2e_9, T_q2e_10, T_q2e_11, T_q2e_12
     
 def execute(pose_matrix):
     #print('pose_matrix \n',pose_matrix)
@@ -375,139 +373,144 @@ def execute(pose_matrix):
     target_pose.orientation.w = quat[3]
     return target_pose
 
-def gripper_init():
-    goal_msg.goal.width = 0.05
-    goal_msg.goal.speed = 0.1
-    goal_msg.goal.force = 0.0
-    pub.publish(goal_msg)
-    rospy.sleep(1.0)
 
 def callback(pose_msg):
     pose_matrix_0 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[0])
     pose_matrix_1 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[1])
-    pose_matrix_2 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[2])
-    pose_matrix_3 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[3])
-    pose_matrix_4 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[4])
-    pose_matrix_5 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[5])
-    pose_matrix_6 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[6])
-    pose_matrix_7 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[7])
-    pose_matrix_8 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[8])
-    pose_matrix_9 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[9])
-    pose_matrix_10 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[10])
-    pose_matrix_11= tft.concatenate_matrices(B2E(), E2Q(pose_msg)[11])
-    pose_matrix_12 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[12])
+    # pose_matrix_2 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[2])
+    # pose_matrix_3 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[3])
+    # pose_matrix_4 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[4])
+    # pose_matrix_5 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[5])
+    # pose_matrix_6 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[6])
+    # pose_matrix_7 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[7])
+    # pose_matrix_8 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[8])
+    # pose_matrix_9 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[9])
+    # pose_matrix_10 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[10])
+    # pose_matrix_11= tft.concatenate_matrices(B2E(), E2Q(pose_msg)[11])
+    # pose_matrix_12 = tft.concatenate_matrices(B2E(), E2Q(pose_msg)[12])
     target_pose_0 = execute(pose_matrix_0)
     target_pose_1 = execute(pose_matrix_1)
-    target_pose_2 = execute(pose_matrix_2)
-    target_pose_3 = execute(pose_matrix_3)
-    target_pose_4 = execute(pose_matrix_4)
-    target_pose_5 = execute(pose_matrix_5)
-    target_pose_6 = execute(pose_matrix_6)
-    target_pose_7 = execute(pose_matrix_7)
-    target_pose_8 = execute(pose_matrix_8)
-    target_pose_9 = execute(pose_matrix_9)
-    target_pose_10 = execute(pose_matrix_10)
-    target_pose_11 = execute(pose_matrix_11)
-    target_pose_12 = execute(pose_matrix_12)
+    # target_pose_2 = execute(pose_matrix_2)
+    # target_pose_3 = execute(pose_matrix_3)
+    # target_pose_4 = execute(pose_matrix_4)
+    # target_pose_5 = execute(pose_matrix_5)
+    # target_pose_6 = execute(pose_matrix_6)
+    # target_pose_7 = execute(pose_matrix_7)
+    # target_pose_8 = execute(pose_matrix_8)
+    # target_pose_9 = execute(pose_matrix_9)
+    # target_pose_10 = execute(pose_matrix_10)
+    # target_pose_11 = execute(pose_matrix_11)
+    # target_pose_12 = execute(pose_matrix_12)
 
     waypoints = []
     wpose = target_pose_0
     waypoints.append(copy.deepcopy(wpose))
     wpose = target_pose_1
     waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_2
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_3
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_4
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_5
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_6
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_7
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_8
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_9
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_10
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_11
-    waypoints.append(copy.deepcopy(wpose))
-    wpose = target_pose_12
-    waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_2
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_3
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_4
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_5
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_6
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_7
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_8
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_9
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_10
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_11
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose = target_pose_12
+    # waypoints.append(copy.deepcopy(wpose))
 
 
     for i, waypoint in enumerate(waypoints):
-        #print('target_pose', waypoint)
+        print('target_pose', waypoint)
         # if i==0:
         #     gripper_init()
 
-        if i == 4:
-            #g.close()
-            #rospy.sleep(5.0)
-            goal_msg.goal.width = 0.017 # for chemspeed vial
-            goal_msg.goal.speed = 0.05
-            goal_msg.goal.force = 5
-            goal_msg.goal.epsilon.inner = 0.001
-            goal_msg.goal.epsilon.outer = 0.005
-            pub.publish(goal_msg)
-            rospy.sleep(2.0)
-        if i == 7:
-            #g.open()
-            goal_msg.goal.width = 0.05
-            goal_msg.goal.speed = 0.1
-            goal_msg.goal.force = 0.0
-            pub.publish(goal_msg)
-            rospy.sleep(2.0)
-        if i == 9:
-            #g.close()pp
-            #rospy.sleep(5.0)
-            goal_msg.goal.width = 0.017 # for chemspeed vial
-            goal_msg.goal.speed = 0.05
-            goal_msg.goal.force = 5
-            goal_msg.goal.epsilon.inner = 0.001
-            goal_msg.goal.epsilon.outer = 0.005
-            pub.publish(goal_msg)
-            rospy.sleep(2.0)
-        if i == 12:
-            #g.open()
-            goal_msg.goal.width = 0.05
-            goal_msg.goal.speed = 0.1
-            goal_msg.goal.force = 0.0
-            pub.publish(goal_msg)
-            rospy.sleep(2.0)
+        # if i == 4:
+        #     #g.close()
+        #     #rospy.sleep(5.0)
+        #     goal_msg.goal.width = 0.017 # for chemspeed vial
+        #     goal_msg.goal.speed = 0.05
+        #     goal_msg.goal.force = 5
+        #     goal_msg.goal.epsilon.inner = 0.001
+        #     goal_msg.goal.epsilon.outer = 0.005
+        #     pub.publish(goal_msg)
+        #     rospy.sleep(2.0)
+        # if i == 7:
+        #     #g.open()
+        #     goal_msg.goal.width = 0.05
+        #     goal_msg.goal.speed = 0.1
+        #     goal_msg.goal.force = 0.0
+        #     pub.publish(goal_msg)
+        #     rospy.sleep(2.0)
+        # if i == 9:
+        #     #g.close()pp
+        #     #rospy.sleep(5.0)
+        #     goal_msg.goal.width = 0.017 # for chemspeed vial
+        #     goal_msg.goal.speed = 0.05
+        #     goal_msg.goal.force = 5
+        #     goal_msg.goal.epsilon.inner = 0.001
+        #     goal_msg.goal.epsilon.outer = 0.005
+        #     pub.publish(goal_msg)
+        #     rospy.sleep(2.0)
+        # if i == 12:
+        #     #g.open()
+        #     goal_msg.goal.width = 0.05
+        #     goal_msg.goal.speed = 0.1
+        #     goal_msg.goal.force = 0.0
+        #     pub.publish(goal_msg)
+        #     rospy.sleep(2.0)
 
-        #gripper_init()
-        move_group.set_pose_target(waypoint, "panda_hand_tcp")
-        plan = move_group.go(wait=True)
-        move_group.clear_pose_targets() 
+        # #gripper_init()
+        # move_group.set_pose_target(waypoint, "panda_hand_tcp")
+        # plan = move_group.go(wait=True)
+        # move_group.clear_pose_targets() 
+        x = waypoint.position.x
+        y = waypoint.position.y
+        z = waypoint.position.z
+        rx = waypoint.orientation.x
+        ry = waypoint.orientation.y
+        rz = waypoint.orientation.z
+        rw = waypoint.orientation.w
+        robotx.move((LinearMotion(Affine(x, y, z, rw, rx, ry,rz))))
+
     sub.unregister()
 
 if __name__ == '__main__':
-    moveit_commander.roscpp_initialize(sys.argv)
+    # moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('grasp_vial')
-    robot = moveit_commander.RobotCommander(robot_description='robot_description') #node name space
-    scene = moveit_commander.PlanningSceneInterface()
-    group_name = "panda_arm"
-    move_group = moveit_commander.MoveGroupCommander(group_name,robot_description='/robot_description')
+    # robot = moveit_commander.RobotCommander(robot_description='robot_description') #node name space
+    # scene = moveit_commander.PlanningSceneInterface()
+    # group_name = "panda_arm"
+    # move_group = moveit_commander.MoveGroupCommander(group_name,robot_description='/robot_description')
     
-    robotx = Robot("172.16.0.2")  # Change IP address 
-    gripper = Gripper(robot)
+    robotx = Robot("10.8.11.204")  # Change IP address 
+    robotx.set_dynamic_rel(0.06)
+    # robotx.move(LinearRelativeMotion(Affine(0, 0.1, 0)))
+    # gripper = Gripper(robot)
 
     # Initialization with frankx
-    robotx.recover()
-    robotx.set_default_behavior()
+    # robotx.recover()
+    # robotx.set_default_behavior()
 
     # p = PandaArm()
     # g = p.get_gripper()
     # print(p.angles())
     move_to_check()
-    pub = rospy.Publisher('/franka_gripper/grasp/goal', GraspActionGoal, queue_size=10)
-    goal_msg = GraspActionGoal()
+    # pub = rospy.Publisher('/franka_gripper/grasp/goal', GraspActionGoal, queue_size=10)
+    # goal_msg = GraspActionGoal()
     sub = rospy.Subscriber('/aruco_single/pose', PoseStamped, callback)
-    move_to_check()
+    # move_to_check()
     rospy.spin()
 
 
