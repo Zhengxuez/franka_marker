@@ -166,6 +166,7 @@ catkin_install_python(PROGRAMS
   scripts/grasp_vial_v1.py
   scripts/grasp_vial_v1_fx.py
   scripts/grasp_vial_fx.py
+  scripts/marker_function.py
 
 
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
