@@ -234,8 +234,9 @@ class franka_marker:
     def execute_saved_waypoints(self):
         with open("Tbase_to_ee.json", "r") as file:
             matrices = json.load(file)["matrix"]
-
-        for matrix_values in matrices:
+        # gripper command here
+        # gripper = frankx.Gripper('10.8.11.204')
+        for i, matrix_values in matrices:
             matrix = np.array(matrix_values)
 
             translation = tuple(matrix[:3, 3])
@@ -243,6 +244,10 @@ class franka_marker:
             quaternion = tft.quaternion_from_matrix(rotation_matrix)
             self.robot.move(LinearMotion(Affine(*translation, *quaternion)))
             time.sleep(1)
+            
+            # if i == 8:
+            #     gripper.grasp(0.04, force=40)
+
 
 if __name__ == "__main__":
 
