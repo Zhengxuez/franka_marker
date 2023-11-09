@@ -17,7 +17,7 @@ from pynput import keyboard
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="marker-based manipulation.")
-    parser.add_argument('--mode', choices=['go_to_check', 'record_waypoint', 'calculate_Tmarker', 'execute_saved_waypoints', 'save_eye_hand', 'save_Tbase_to_ee', 'save_current_Tcamera_to_marker', 'save_Tcamera_to_marker_1'], required=True,
+    parser.add_argument('--mode', choices=['recover', 'go_to_check', 'record_waypoint', 'calculate_Tmarker', 'execute_saved_waypoints', 'save_eye_hand', 'save_Tbase_to_ee', 'save_current_Tcamera_to_marker', 'save_Tcamera_to_marker_1'], required=True,
                         help="Mode in which to run the server.")
     return parser.parse_args()
 
@@ -122,12 +122,11 @@ class franka_marker:
     def save_Tee_to_camera_to_json(self):
         # calibration result
         matrix = [
-            [-0.72764462, -0.68585163, -0.01186786, 0.05192262],
-            [0.68595005, -0.72747031, -0.01610833, 0.00849046],
-            [0.00241441, -0.01986189, 0.99979982, 0.0033307],
+            [-4.95490712e-02, -9.98541322e-01, -2.14503745e-02, 4.70602376e-02],
+            [9.98771237e-01, -4.95171519e-02, -2.01697481e-03, -3.16416358e-02],
+            [9.51871243e-04, -2.15239563e-02, 9.99767880e-01, 1.35281097e-01],
             [0, 0, 0, 1]
         ]
-        
 
         data = {    
             "matrix": matrix
@@ -247,10 +246,14 @@ class franka_marker:
             json.dump({"matrix": Tbase_to_ee.tolist()}, file, indent=4)
     
     def execute_saved_waypoints(self):
+        
+
+
         with open("Tbase_to_ee.json", "r") as file:
             matrices = json.load(file)["matrix"]
         # gripper command here
         # gripper = frankx.Gripper('10.8.11.204')
+        # for i, matrix_values in enumerate(matrices[1:], start=1):
         for i, matrix_values in enumerate(matrices):
             matrix = np.array(matrix_values)
 
@@ -258,7 +261,10 @@ class franka_marker:
             rotation_matrix_4x4 = np.eye(4)
             rotation_matrix_4x4[:3, :3] = matrix[:3, :3]
             quaternion = tft.quaternion_from_matrix(rotation_matrix_4x4)
-
+            self.robot.set_default_behavior()
+            time.sleep(0.5)
+            self.robot.recover_from_errors()
+            time.sleep(1)
             self.robot.move(LinearMotion(Affine(*translation, quaternion[3], quaternion[0], quaternion[1], quaternion[2])))
             time.sleep(2)
             
@@ -266,10 +272,15 @@ class franka_marker:
             #     gripper.grasp(0.04, force=40)
 
     def go_to_check(self):
+        self.robot.set_default_behavior()
+        time.sleep(0.5)
+        self.robot.recover_from_errors()
+
         with open("ee_poses.json", "r") as file:
             matrices = json.load(file)["matrix"]
         
         matrix = np.array(matrices[0])
+        print('check pose', matrix)
         translation = matrix[:3, 3]
         rotation_matrix_4x4 = np.eye(4)
         rotation_matrix_4x4[:3, :3] = matrix[:3, :3]
@@ -278,6 +289,13 @@ class franka_marker:
         quaternion = tft.quaternion_from_matrix(rotation_matrix_4x4)
         self.robot.move(LinearMotion(Affine(*translation, quaternion[3], quaternion[0], quaternion[1], quaternion[2])))
         time.sleep(1)
+
+    def recover(self):
+        # self.robot.set_default_behavior()
+
+        # state = self.robot.read_once()
+        # pose = self.robot.current_pose()
+        self.robot.recover_from_errors()
 
 
 if __name__ == "__main__":
@@ -302,6 +320,8 @@ if __name__ == "__main__":
         franka_qr.save_Tee_to_camera_to_json()
     elif args.mode == "go_to_check":
         franka_qr.go_to_check()
+    elif args.mode == "recover":
+        franka_qr.recover()
 
     else:
         print("Unknown mode. Exiting.")
